@@ -10,33 +10,20 @@
  */
 package com.tomitribe.agumbrecht.interceptor;
 
+import com.tomitribe.agumbrecht.qualifiers.ObjectCache;
+
 import javax.cache.Cache;
-import javax.cache.CacheManager;
-import javax.cache.Caching;
-import javax.cache.configuration.CompleteConfiguration;
-import javax.cache.configuration.MutableConfiguration;
-import javax.cache.spi.CachingProvider;
+import javax.inject.Inject;
 import javax.interceptor.AroundInvoke;
 import javax.interceptor.InvocationContext;
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class CacheInterceptor {
 
-    private static final AtomicReference<Cache<String, Object>> cache = new AtomicReference<Cache<String, Object>>();
-
-    static {
-        final CachingProvider cachingProvider = Caching.getCachingProvider();
-
-        final CacheManager cacheManager = cachingProvider.getCacheManager();
-
-        final CompleteConfiguration<String, Object> config = new MutableConfiguration<String, Object>()
-                .setTypes(String.class, Object.class);
-
-        cache.set(cacheManager.createCache("example", config));
-    }
+    @Inject
+    @ObjectCache
+    private Cache<String, ObjectWrapper> cache;
 
     @AroundInvoke
     public Object cache(final InvocationContext ctx) throws Exception {
@@ -49,13 +36,26 @@ public class CacheInterceptor {
 
         final String key = name + ":" + method.getName() + ":" + s;
 
-        Object o = cache.get().get(key);
+        ObjectWrapper o = cache.get(key);
 
         if (null == o) {
-            o = ctx.proceed();
-            cache.get().put(key, o);
+            o = new ObjectWrapper(ctx.proceed());
+            cache.put(key, o);
         }
 
-        return o;
+        return o.getObject();
+    }
+
+    public static class ObjectWrapper {
+
+        private final Object object;
+
+        public ObjectWrapper(final Object object) {
+            this.object = object;
+        }
+
+        public Object getObject() {
+            return object;
+        }
     }
 }

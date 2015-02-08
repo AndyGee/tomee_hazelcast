@@ -66,6 +66,7 @@ public class InterceptedServiceTest extends Assert {
     @Deployment
     public static WebArchive createDeployment() {
         return ShrinkWrap.create(WebArchive.class)
+
                 .addClasses(
                         BookService.class,
                         Book.class,
