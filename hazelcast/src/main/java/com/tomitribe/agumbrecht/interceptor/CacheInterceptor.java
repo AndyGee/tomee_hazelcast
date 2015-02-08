@@ -23,7 +23,7 @@ public class CacheInterceptor {
 
     @Inject
     @ObjectCache
-    private Cache<String, ObjectWrapper> cache;
+    private Cache<String, Object> cache;
 
     @AroundInvoke
     public Object cache(final InvocationContext ctx) throws Exception {
@@ -36,26 +36,13 @@ public class CacheInterceptor {
 
         final String key = name + ":" + method.getName() + ":" + s;
 
-        ObjectWrapper o = cache.get(key);
+        Object o = cache.get(key);
 
         if (null == o) {
-            o = new ObjectWrapper(ctx.proceed());
+            o = ctx.proceed();
             cache.put(key, o);
         }
 
-        return o.getObject();
-    }
-
-    public static class ObjectWrapper {
-
-        private final Object object;
-
-        public ObjectWrapper(final Object object) {
-            this.object = object;
-        }
-
-        public Object getObject() {
-            return object;
-        }
+        return o;
     }
 }

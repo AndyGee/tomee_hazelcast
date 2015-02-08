@@ -17,8 +17,11 @@
 package com.tomitribe.agumbrecht.application;
 
 import com.tomitribe.agumbrecht.entities.Book;
+import com.tomitribe.agumbrecht.qualifiers.ObjectCache;
 
+import javax.cache.Cache;
 import javax.ejb.Stateless;
+import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.criteria.CriteriaQuery;
@@ -26,6 +29,11 @@ import java.util.List;
 
 @Stateless
 public class BookService {
+
+
+    @Inject
+    @ObjectCache
+    private Cache<String, Object> cache;
 
     @PersistenceContext(unitName = "book-pu")
     private EntityManager entityManager;
@@ -39,5 +47,14 @@ public class BookService {
         final CriteriaQuery<Book> cq = entityManager.getCriteriaBuilder().createQuery(Book.class);
         cq.select(cq.from(Book.class));
         return entityManager.createQuery(cq).getResultList();
+    }
+
+    public void update(final int id, final String title) {
+        final Book book = entityManager.find(Book.class, id);
+        book.setBookTitle(title);
+    }
+
+    public void clear(){
+        cache.clear();
     }
 }

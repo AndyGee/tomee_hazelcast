@@ -38,6 +38,7 @@ public class InterceptedService {
     @Produces({APPLICATION_JSON})
     @Interceptors({CacheInterceptor.class})
     public Book getBook(@PathParam("id") final int id) {
+
         final List<Book> allBooks = bookService.getAllBooks();
         for (final Book book : allBooks) {
             if (id == book.getBookId()) {

@@ -19,7 +19,13 @@ package com.tomitribe.agumbrecht;
 import com.tomitribe.agumbrecht.application.BookService;
 import com.tomitribe.agumbrecht.entities.Book;
 import com.tomitribe.agumbrecht.interceptor.CacheInterceptor;
+import com.tomitribe.agumbrecht.producers.HazelcastProducer;
+import com.tomitribe.agumbrecht.producers.ObjectCacheProducer;
+import com.tomitribe.agumbrecht.qualifiers.Hazelcast;
+import com.tomitribe.agumbrecht.qualifiers.LocalCacheProvider;
+import com.tomitribe.agumbrecht.qualifiers.ObjectCache;
 import com.tomitribe.agumbrecht.service.InterceptedService;
+import com.tomitribe.agumbrecht.service.ServiceApplication;
 import org.apache.cxf.jaxrs.client.WebClient;
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.junit.Arquillian;
@@ -34,33 +40,32 @@ import org.junit.runner.RunWith;
 
 import javax.inject.Inject;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URISyntaxException;
 import java.net.URL;
 
 /**
  * Arquillian will start the container, deploy all @Deployment bundles, then run all the @Test methods.
- *
+ * <p/>
  * A strong value-add for Arquillian is that the test is abstracted from the server.
  * It is possible to rerun the same test against multiple adapters or server configurations.
- *
+ * <p/>
  * A second value-add is it is possible to build WebArchives that are slim and trim and therefore
  * isolate the functionality being tested.  This also makes it easier to swap out one implementation
  * of a class for another allowing for easy mocking.
- *
  */
 @RunWith(Arquillian.class)
 public class InterceptedServiceTest extends Assert {
 
     /**
      * ShrinkWrap is used to create a war file on the fly.
-     *
+     * <p/>
      * The API is quite expressive and can build any possible
      * flavor of war file.  It can quite easily return a rebuilt
      * war file as well.
-     *
+     * <p/>
      * More than one @Deployment method is allowed.
      */
     @Deployment
@@ -68,9 +73,15 @@ public class InterceptedServiceTest extends Assert {
         return ShrinkWrap.create(WebArchive.class)
 
                 .addClasses(
+                        ServiceApplication.class,
                         BookService.class,
                         Book.class,
                         CacheInterceptor.class,
+                        ObjectCache.class,
+                        LocalCacheProvider.class,
+                        Hazelcast.class,
+                        ObjectCacheProducer.class,
+                        HazelcastProducer.class,
                         InterceptedService.class)
                 .addAsResource("persistence.xml", "META-INF/persistence.xml")
                 .addAsWebInfResource(EmptyAsset.INSTANCE, ArchivePaths.create("beans.xml"));
@@ -78,12 +89,11 @@ public class InterceptedServiceTest extends Assert {
 
     /**
      * This URL will contain the following URL data
-     *
-     *  - http://<host>:<port>/<webapp>/
-     *
+     * <p/>
+     * - http://<host>:<port>/<webapp>/
+     * <p/>
      * This allows the test itself to be agnostic of server information or even
      * the name of the webapp
-     *
      */
     @ArquillianResource
     private URL url;
@@ -99,14 +109,31 @@ public class InterceptedServiceTest extends Assert {
 
         final int id = bookService.addBook(book);
 
-        final WebClient webClient = WebClient.create(url.toURI());
-        webClient.accept(MediaType.APPLICATION_JSON);
-
-        book = webClient.path("intercept/" + id).get(Book.class);
+        //First call caches stored
+        book = getClient().path("api/intercept/" + id).get(Book.class);
 
         assertEquals("Invalid book id", id, book.getBookId());
         assertEquals("Invalid book name", "War and Peace", book.getBookTitle());
 
+        bookService.update(id, "Harry met Sally");
+
+        //Get cached version
+        book = getClient().path("api/intercept/" + id).get(Book.class);
+
+        assertEquals("Invalid book id", id, book.getBookId());
+        assertEquals("Invalid book name", "War and Peace", book.getBookTitle());
+
+        //Get stored version
+        bookService.clear();
+        book = getClient().path("api/intercept/" + id).get(Book.class);
+
+        assertEquals("Invalid book id", id, book.getBookId());
+        assertEquals("Invalid book name", "Harry met Sally", book.getBookTitle());
+
+    }
+
+    private WebClient getClient() throws URISyntaxException {
+        return WebClient.create(url.toURI()).accept(MediaType.APPLICATION_JSON);
     }
 
     /**

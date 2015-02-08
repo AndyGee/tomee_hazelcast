@@ -13,26 +13,18 @@ package com.tomitribe.agumbrecht.producers;
 import com.hazelcast.cache.impl.HazelcastServerCachingProvider;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.HazelcastInstance;
-import com.tomitribe.agumbrecht.interceptor.CacheInterceptor;
 import com.tomitribe.agumbrecht.qualifiers.Hazelcast;
 import com.tomitribe.agumbrecht.qualifiers.LocalCacheProvider;
-import com.tomitribe.agumbrecht.qualifiers.ObjectCache;
 
-import javax.cache.Cache;
 import javax.cache.CacheManager;
-import javax.cache.configuration.MutableConfiguration;
-import javax.cache.expiry.AccessedExpiryPolicy;
-import javax.cache.expiry.Duration;
+import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.inject.Disposes;
 import javax.enterprise.inject.Produces;
 import javax.inject.Singleton;
 import java.net.URL;
-import java.util.concurrent.TimeUnit;
 
+@ApplicationScoped
 public class HazelcastProducer {
-
-    private static final String CACHE_NAME = System.getProperty("jcache.cache.name", "object_cache");
-    public static final int DURATION = Integer.parseInt(System.getProperty("jcache.cache.duration", "60"));
 
     @Produces
     @Singleton
@@ -45,7 +37,7 @@ public class HazelcastProducer {
         final Config config = new Config();
 
         config.setConfigurationUrl(location);
-        config.setInstanceName("ExampleInstance");
+        config.setInstanceName("TomEEInstance");
 
         return com.hazelcast.core.Hazelcast.newHazelcastInstance(config);
     }
@@ -55,21 +47,6 @@ public class HazelcastProducer {
     @LocalCacheProvider
     public CacheManager createCacheManager(@Hazelcast final HazelcastInstance instance) {
         return HazelcastServerCachingProvider.createCachingProvider(instance).getCacheManager();
-    }
-
-
-    @Produces
-    @Singleton
-    @ObjectCache
-    public Cache<String, CacheInterceptor.ObjectWrapper> createUserCache(@LocalCacheProvider final CacheManager cacheManager) {
-
-        final MutableConfiguration<String, CacheInterceptor.ObjectWrapper> config = new MutableConfiguration<String, CacheInterceptor.ObjectWrapper>();
-        config.setStoreByValue(true)
-                .setTypes(String.class, CacheInterceptor.ObjectWrapper.class)
-                .setExpiryPolicyFactory(AccessedExpiryPolicy.factoryOf(new Duration(TimeUnit.SECONDS, DURATION)))
-                .setStatisticsEnabled(false);
-
-        return cacheManager.createCache(CACHE_NAME, config);
     }
 
     public void close(@Disposes @Hazelcast final HazelcastInstance instance) {
